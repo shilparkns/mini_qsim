@@ -1,0 +1,61 @@
+# === Python build ===
+__pycache__/
+*.py[cod]
+*$py.class
+
+# === Virtual environments ===
+.venv/
+venv/
+env/
+ENV/
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Notebooks ===
+*.ipynb_checkpoints/
+*.ipynb
+
+# === Build / Distribution ===
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# === Logs / Outputs ===
+*.log
+*.out
+*.err
+nohup.out
+
+# === Data & results ===
+data/results.csv
+data/*.tmp
+data/*.npy
+
+# === Tests & coverage ===
+.cache/
+pytest_cache/
+.coverage
+htmlcov/
+
+# === Temporary / local ===
+*.bak
+*.tmp
+*.old
+*.local
+
+# === Colab / Jupyter artifacts ===
+*.json
+*.ipynb_checkpoints/
