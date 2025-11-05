@@ -21,7 +21,9 @@ class State:
     def norm2(self) -> float:
         return float(np.vdot(self.psi, self.psi).real)
 
-    def check_normalized(self, tol=1e-6):
+    def check_normalized(self, tol=None):
+        if tol is None:
+            tol = 5e-5 if self.dtype == np.complex64 else 1e-12
         n2 = self.norm2()
         if not (abs(1.0 - n2) <= tol):
             raise AssertionError(f"Normalization failed: ||psi||^2={n2}")

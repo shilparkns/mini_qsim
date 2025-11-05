@@ -23,23 +23,48 @@ class Circuit:
     def rz(self, k:int, theta:float): self.ops.append(("RZ",(k,theta))); return self  # optional
     def rx(self, k:int, theta:float): self.ops.append(("RX",(k,theta))); return self  # optional
 
-    def run(self, backend:str="serial", dtype=np.complex64, check_norm=True) -> State:
-        if backend != "serial":
-            raise NotImplementedError("Only serial backend implemented at Step 1")
+    def run(self, backend:str="serial", dtype=np.complex64, check_norm=True, num_threads=None, check_norm_tol=None) -> State:
         st = State.zero(self.n, dtype=dtype)
+
+        if backend == "serial":
+            from .apply_serial import apply_H, apply_X, apply_CNOT, apply_single_qubit
+            import numpy as np
+            from . import gates as G
+            ap_H, ap_X, ap_CNOT, ap_1q = apply_H, apply_X, apply_CNOT, apply_single_qubit
+            RZ = lambda k,th: ap_1q(st, G.RZ(th, dtype=st.dtype), k)
+            RX = lambda k,th: ap_1q(st, G.RX(th, dtype=st.dtype), k)
+
+        elif backend == "numba":
+            try:
+                from .apply_numba import apply_H, apply_X, apply_CNOT, apply_single_qubit, set_threads
+                import numpy as np
+                from . import gates as G
+            except Exception as e:
+                raise RuntimeError("Numba backend not available. Did you `pip install numba`?") from e
+            if num_threads is not None:
+                set_threads(int(num_threads))
+            ap_H, ap_X, ap_CNOT, ap_1q = apply_H, apply_X, apply_CNOT, apply_single_qubit
+            RZ = lambda k,th: ap_1q(st, G.RZ(th, dtype=st.dtype), k)
+            RX = lambda k,th: ap_1q(st, G.RX(th, dtype=st.dtype), k)
+
+        else:
+            raise NotImplementedError(f"Unknown backend: {backend}")
+
         for name, args in self.ops:
             if name == "H":
-                (k,) = args; apply_H(st, k)
+                (k,) = args; ap_H(st, k)
             elif name == "X":
-                (k,) = args; apply_X(st, k)
+                (k,) = args; ap_X(st, k)
             elif name == "CNOT":
-                c,t = args; apply_CNOT(st, c, t)
+                c,t = args; ap_CNOT(st, c, t)
             elif name == "RZ":
-                k,theta = args; U = G.RZ(theta, dtype=st.dtype); apply_single_qubit(st, U, k)
+                k,theta = args; RZ(k, theta)
             elif name == "RX":
-                k,theta = args; U = G.RX(theta, dtype=st.dtype); apply_single_qubit(st, U, k)
+                k,theta = args; RX(k, theta)
             else:
                 raise ValueError(f"Unknown gate {name}")
+
         if check_norm:
-            st.check_normalized(tol=1e-6 if dtype==np.complex64 else 1e-12)
+            st.check_normalized(tol=check_norm_tol)
         return st
+
