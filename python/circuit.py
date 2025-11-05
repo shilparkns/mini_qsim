@@ -46,6 +46,15 @@ class Circuit:
             ap_H, ap_X, ap_CNOT, ap_1q = apply_H, apply_X, apply_CNOT, apply_single_qubit
             RZ = lambda k,th: ap_1q(st, G.RZ(th, dtype=st.dtype), k)
             RX = lambda k,th: ap_1q(st, G.RX(th, dtype=st.dtype), k)
+        elif backend == "cupy":
+            try:
+                from .apply_cupy import apply_H, apply_X, apply_CNOT, apply_single_qubit, apply_two_qubit_4x4, to_host
+            except Exception as e:
+                raise RuntimeError("CuPy backend not available. Install CuPy on a CUDA machine.") from e
+            ap_H, ap_X, ap_CNOT, ap_1q = apply_H, apply_X, apply_CNOT, apply_single_qubit
+            RZ = lambda k,th: ap_1q(st, G.RZ(th, dtype=st.dtype), k)
+            RX = lambda k,th: ap_1q(st, G.RX(th, dtype=st.dtype), k)
+
 
         else:
             raise NotImplementedError(f"Unknown backend: {backend}")
@@ -66,5 +75,7 @@ class Circuit:
 
         if check_norm:
             st.check_normalized(tol=check_norm_tol)
+        if backend == "cupy":
+            to_host(st)
         return st
 

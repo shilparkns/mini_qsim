@@ -1,5 +1,5 @@
 qubits,depth,backend,threads,gates,wall_ms,hostname,commit,dtype,timestamp
-12,100,numba,8,900,40.121,air.local,95bfa1c,complex64,2025-11-04T18:31:00
-14,100,numba,8,1050,45.938,air.local,95bfa1c,complex64,2025-11-04T18:31:00
-16,100,numba,8,1200,68.263,air.local,95bfa1c,complex64,2025-11-04T18:31:00
-18,100,numba,8,1350,125.426,air.local,95bfa1c,complex64,2025-11-04T18:31:00
+20,200,numba,8,3000,667.852,air.local,2cb1883,complex64,2025-11-04T22:56:20
+22,200,numba,8,3300,2491.461,air.local,2cb1883,complex64,2025-11-04T22:56:23
+24,200,numba,8,3600,11298.878,air.local,2cb1883,complex64,2025-11-04T22:56:34
+26,200,numba,8,3900,50515.516,air.local,2cb1883,complex64,2025-11-04T22:57:24

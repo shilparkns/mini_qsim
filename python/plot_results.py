@@ -64,19 +64,26 @@ def plot_speedup_vs_threads(rows, tag):
     plt.savefig(os.path.join(DATA_DIR, f"speedup_vs_threads_{tag}.png"), dpi=200)
 
 def plot_runtime_vs_depth(rows, tag):
-    pts = [r for r in rows if r["qubits"] == 12]
+    from collections import defaultdict
+    import matplotlib.pyplot as plt, os
+
+    # detect which qubit counts exist
+    qubits_list = sorted(set(r["qubits"] for r in rows))
     by_backend = defaultdict(list)
-    for r in pts:
+
+    # plot all qubit counts that exist
+    for r in rows:
         by_backend[r["backend"]].append((r["depth"], r["wall_ms"]))
+
     plt.figure()
-    for be, p in by_backend.items():
-        xs, ys = zip(*sorted(p))
-        plt.plot(xs, ys, marker="o", label=be)
+    for be, pts in by_backend.items():
+        xs, ys = zip(*sorted(pts))
+        plt.plot(xs, ys, marker="o", label=f"{be} (n={qubits_list[0]})")
     plt.xlabel("Depth")
     plt.ylabel("Runtime (ms)")
     plt.title(f"Runtime vs Depth [{tag}]")
-    plt.legend()
     plt.grid(True)
+    plt.legend()
     plt.savefig(os.path.join(DATA_DIR, f"runtime_vs_depth_{tag}.png"), dpi=200)
 
 def plot_runtime_vs_threads(rows, tag):
@@ -98,6 +105,72 @@ def plot_runtime_vs_threads(rows, tag):
     plt.title(f"Runtime vs Threads [{tag}]")
     plt.grid(True)
     plt.savefig(os.path.join(DATA_DIR, f"runtime_vs_threads_{tag}.png"), dpi=200)
+
+def plot_depth_compare_all():
+    import os, csv
+    import matplotlib.pyplot as plt
+
+    base = os.path.join(os.path.dirname(__file__), "..", "data")
+    paths = {
+        "serial": os.path.join(base, "serial", "depth.csv"),
+        "numba":  os.path.join(base, "numba",  "depth.csv"),
+        "cupy":   os.path.join(base, "cupy",   "depth.csv"),
+    }
+
+    series = {}
+    for be, p in paths.items():
+        if not os.path.exists(p):
+            continue
+        with open(p, "r") as f:
+            r = csv.DictReader(f)
+            pts = [(int(row["depth"]), float(row["wall_ms"])) for row in r]
+        pts = sorted(pts)
+        if pts:
+            series[be] = pts
+
+    if not series:
+        print("plot_depth_compare_all: no depth.csv files found.")
+        return
+
+    plt.figure()
+    for be, pts in series.items():
+        xs, ys = zip(*pts)
+        plt.plot(xs, ys, marker="o", label=be)
+    plt.xlabel("Depth")
+    plt.ylabel("Runtime (ms)")
+    plt.title("Runtime vs Depth — serial vs numba vs cupy")
+    plt.grid(True); plt.legend()
+    out = os.path.join(base, "runtime_vs_depth_compare.png")
+    plt.savefig(out, dpi=200)
+    print(f"Saved {out}")
+
+
+def plot_qubits_compare_all():
+    import os, csv, matplotlib.pyplot as plt
+    base = os.path.join(os.path.dirname(__file__), "..", "data")
+    paths = {
+        "serial": os.path.join(base, "serial", "qubits.csv"),
+        "numba":  os.path.join(base, "numba",  "qubits.csv"),
+        "cupy":   os.path.join(base, "cupy",   "qubits.csv"),
+    }
+    series = {}
+    for be, p in paths.items():
+        if not os.path.exists(p): continue
+        with open(p, "r") as f:
+            r = csv.DictReader(f)
+            pts = sorted([(int(x["qubits"]), float(x["wall_ms"])) for x in r])
+        if pts: series[be] = pts
+    if not series: return
+    plt.figure()
+    for be, pts in series.items():
+        xs, ys = zip(*pts)
+        plt.plot(xs, ys, marker="o", label=be)
+    plt.xlabel("Qubits (n)")
+    plt.ylabel("Runtime (ms)")
+    plt.title("Runtime vs Qubits — serial vs numba vs cupy")
+    plt.grid(True); plt.legend()
+    out = os.path.join(base, "runtime_vs_qubits_compare.png")
+    plt.savefig(out, dpi=200)
 
 def plot_qubits_compare():
     import os, csv
@@ -140,6 +213,128 @@ def plot_qubits_compare():
     plt.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, "runtime_vs_qubits_compare.png"), dpi=200)
+
+def plot_gpu_cpu_speedup_qubits(fixed_depth=None):
+    import os, csv, math
+    import matplotlib.pyplot as plt
+    base = os.path.join(os.path.dirname(__file__), "..", "data")
+    numba_p = os.path.join(base, "numba", "qubits.csv")
+    cupy_p  = os.path.join(base, "cupy",  "qubits.csv")
+    if not (os.path.exists(numba_p) and os.path.exists(cupy_p)):
+        print("plot_gpu_cpu_speedup_qubits: missing numba/cupy qubits.csv")
+        return
+
+    # load rows grouped by (n, depth)
+    def load(path):
+        rows = {}
+        with open(path, "r") as f:
+            r = csv.DictReader(f)
+            for row in r:
+                n = int(row["qubits"]); d = int(row["depth"])
+                rows[(n, d)] = float(row["wall_ms"])
+        return rows
+
+    numba = load(numba_p)
+    cupy  = load(cupy_p)
+
+    # pick a depth: use `fixed_depth` if provided, else the most common intersection
+    depths = sorted(set(d for (_, d) in numba.keys()) & set(d for (_, d) in cupy.keys()))
+    if not depths:
+        print("plot_gpu_cpu_speedup_qubits: no overlapping depths.")
+        return
+    if fixed_depth is None:
+        from collections import Counter
+        c = Counter([d for (_, d) in numba.keys() if ( _, d ) in numba])  # simple pick
+        # choose the smallest overlapping depth to be safe
+        d0 = min(depths)
+    else:
+        d0 = fixed_depth
+        if d0 not in depths:
+            print(f"plot_gpu_cpu_speedup_qubits: depth {d0} not found in overlap {depths}")
+            return
+
+    # collect matching n at depth d0
+    ns = sorted(set(n for (n, d) in numba.keys() if d == d0) & set(n for (n, d) in cupy.keys() if d == d0))
+    if not ns:
+        print("plot_gpu_cpu_speedup_qubits: no matching ns at chosen depth.")
+        return
+
+    xs = [str(n) for n in ns]
+    speedups = []
+    print("\nGPU/CPU speedup table (Numba / CuPy) at depth =", d0)
+    print("n\tCPU(ms)\tGPU(ms)\tSpeedup")
+    for n in ns:
+        cpu = numba[(n, d0)]
+        gpu = cupy[(n, d0)]
+        sp  = cpu / gpu if gpu > 0 else math.nan
+        speedups.append(sp)
+        print(f"{n}\t{cpu:.2f}\t{gpu:.2f}\t{sp:.2f}×")
+
+    # bar chart
+    plt.figure()
+    plt.bar(xs, speedups)
+    plt.xlabel("Qubits (n)")
+    plt.ylabel("Speedup (Numba / CuPy)")
+    plt.title(f"GPU/CPU Speedup vs Qubits (depth={d0})")
+    plt.grid(True, axis="y")
+    out = os.path.join(base, "gpu_cpu_speedup_qubits.png")
+    plt.savefig(out, dpi=200)
+    print(f"Saved {out}")
+
+def plot_gpu_cpu_speedup_depth(fixed_n=None):
+    import os, csv, math
+    import matplotlib.pyplot as plt
+    base = os.path.join(os.path.dirname(__file__), "..", "data")
+    numba_p = os.path.join(base, "numba", "depth.csv")
+    cupy_p  = os.path.join(base, "cupy",  "depth.csv")
+    if not (os.path.exists(numba_p) and os.path.exists(cupy_p)):
+        print("plot_gpu_cpu_speedup_depth: missing numba/cupy depth.csv")
+        return
+
+    def load(path):
+        rows = {}
+        with open(path, "r") as f:
+            r = csv.DictReader(f)
+            for row in r:
+                n = int(row["qubits"]); d = int(row["depth"])
+                rows[(n, d)] = float(row["wall_ms"])
+        return rows
+
+    numba = load(numba_p)
+    cupy  = load(cupy_p)
+
+    # choose n
+    ns = sorted(set(n for (n, _) in numba.keys()) & set(n for (n, _) in cupy.keys()))
+    if not ns:
+        print("plot_gpu_cpu_speedup_depth: no overlapping n.")
+        return
+    n0 = fixed_n or ns[0]  # pick first overlapping n if not provided
+
+    depths = sorted(set(d for (n, d) in numba.keys() if n == n0) & set(d for (n, d) in cupy.keys() if n == n0))
+    if not depths:
+        print(f"plot_gpu_cpu_speedup_depth: no depths for n={n0}.")
+        return
+
+    xs = [str(d) for d in depths]
+    speedups = []
+    print(f"\nGPU/CPU speedup table (Numba / CuPy) at n = {n0}")
+    print("depth\tCPU(ms)\tGPU(ms)\tSpeedup")
+    for d in depths:
+        cpu = numba[(n0, d)]
+        gpu = cupy[(n0, d)]
+        sp  = cpu / gpu if gpu > 0 else math.nan
+        speedups.append(sp)
+        print(f"{d}\t{cpu:.2f}\t{gpu:.2f}\t{sp:.2f}×")
+
+    plt.figure()
+    plt.bar(xs, speedups)
+    plt.xlabel("Depth")
+    plt.ylabel("Speedup (Numba / CuPy)")
+    plt.title(f"GPU/CPU Speedup vs Depth (n={n0})")
+    plt.grid(True, axis="y")
+    out = os.path.join(base, "gpu_cpu_speedup_depth.png")
+    plt.savefig(out, dpi=200)
+    print(f"Saved {out}")
 
 
 def main():
@@ -184,8 +379,13 @@ def main():
             plot_speedup_vs_threads(rows, f"{backend}")
 
         DATA_DIR = old_dir
-    plot_qubits_compare()
+        
+    plot_qubits_compare_all()
+    plot_depth_compare_all()
+    plot_gpu_cpu_speedup_qubits(fixed_depth=200)
+    plot_gpu_cpu_speedup_depth(fixed_n=18)
     print("\nSaved all plots under data/<backend>/*.png")
+
 
 
 

@@ -1,0 +1,5 @@
+qubits,depth,backend,threads,gates,wall_ms,hostname,commit,dtype,timestamp
+16,200,cupy,12,2400,1163.740,06f4cff90aa5,,complex64,2025-11-05T05:35:36
+18,200,cupy,12,2700,1336.995,06f4cff90aa5,,complex64,2025-11-05T05:35:37
+20,200,cupy,12,3000,1492.271,06f4cff90aa5,,complex64,2025-11-05T05:35:39
+22,200,cupy,12,3300,1834.305,06f4cff90aa5,,complex64,2025-11-05T05:35:40

@@ -69,6 +69,12 @@ def random_circuit(n, depth, seed=0):
 def time_run(circ, backend, threads=None):
     t0 = time.perf_counter()
     _ = circ.run(backend=backend, dtype=np.complex64, num_threads=threads, check_norm=False)
+
+    # --- GPU sync for accurate timing ---
+    if backend == "cupy":
+        import cupy as cp
+        cp.cuda.get_current_stream().synchronize()
+
     return (time.perf_counter() - t0) * 1e3  # ms
 
 def numba_max_threads():
@@ -154,7 +160,7 @@ def main():
     p_qubits = sub.add_parser("qubits")
     p_qubits.add_argument("--ns", type=str, required=True)
     p_qubits.add_argument("--depth", type=int, default=100)
-    p_qubits.add_argument("--backend", type=str, default="numba", choices=["serial","numba"])
+    p_qubits.add_argument("--backend", type=str, default="numba", choices=["serial","numba", "cupy"])
 
     p_threads = sub.add_parser("threads")
     p_threads.add_argument("--n", type=int, default=16)
@@ -166,7 +172,7 @@ def main():
     p_depth = sub.add_parser("depth")
     p_depth.add_argument("--n", type=int, default=12)
     p_depth.add_argument("--depths", type=str, default="10,50,100,300,600")
-    p_depth.add_argument("--backend", type=str, default="numba", choices=["serial","numba"])
+    p_depth.add_argument("--backend", type=str, default="numba", choices=["serial","numba","cupy"])
 
     args = p.parse_args()
 
