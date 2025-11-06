@@ -31,7 +31,7 @@ def median_by_key(rows, key_fields):
     return agg
 
 def plot_runtime_vs_qubits(rows, tag):
-    pts = [r for r in rows if r["depth"] == 100]
+    pts = [r for r in rows if r["depth"] == 200]
     if not pts: return
     by_backend = defaultdict(list)
     for r in pts:
@@ -123,7 +123,7 @@ def plot_depth_compare_all():
             continue
         with open(p, "r") as f:
             r = csv.DictReader(f)
-            pts = [(int(row["depth"]), float(row["wall_ms"])) for row in r]
+            pts = [(int(row["depth"]), float(row["wall_ms"])) for row in r if row["qubits"] == '26']
         pts = sorted(pts)
         if pts:
             series[be] = pts
